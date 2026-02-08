@@ -8,3 +8,7 @@ Thumbs.db
 .env*
 .vscode/
 .idea/
+./dist
+.claude
+.specify
+specs

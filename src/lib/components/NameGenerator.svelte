@@ -11,6 +11,8 @@
   import NameCard from "./NameCard.svelte";
   import LoadingOverlay from "./LoadingOverlay.svelte";
   import BookSelector from "./BookSelector.svelte";
+  import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
 
   let selectedBook = $state(DEFAULT_BOOK);
   let familyName = $state(DEFAULT_FAMILY_NAME);
@@ -36,112 +38,62 @@
   }
 </script>
 
-<div class="input-container">
-  <h3 class="title">你的名字<small> 古诗文起名V2.0</small></h3>
+<div class="space-y-10">
+  <!-- Header section -->
+  <header class="pt-12 md:pt-16 text-center">
+    <h1 class="font-serif text-3xl font-bold tracking-tight text-stone-900">
+      你的名字
+    </h1>
+    <p class="text-sm text-stone-500 mt-1">古诗文起名</p>
+    <hr class="border-accent/30 w-16 mx-auto mt-4 mb-0" />
+  </header>
+
+  <!-- Book selector -->
   <div>
-    <div>本项目全部开源, 作者:holynova</div>
-    <a target="_blank" href="https://github.com/holynova/gushi_namer"
-      >fork me on Github</a
+    <BookSelector
+      books={BOOKS}
+      {selectedBook}
+      onchange={handleBookChange}
+      disabled={isLoading}
+    />
+  </div>
+
+  <!-- Family name input -->
+  <div class="flex items-center gap-3">
+    <label for="family-name" class="text-base font-medium text-stone-700"
+      >姓氏</label
+    >
+    <Input
+      id="family-name"
+      type="text"
+      class="max-w-30"
+      bind:value={familyName}
+      placeholder="李"
+    />
+  </div>
+
+  <!-- Generate button -->
+  <div>
+    <Button
+      class="w-full h-12 bg-accent text-text-on-accent hover:bg-accent-hover text-base font-medium cursor-pointer"
+      onclick={handleGenerate}
+      disabled={isLoading || poems.length === 0}>起名</Button
     >
   </div>
 
-  <BookSelector
-    books={BOOKS}
-    {selectedBook}
-    onchange={handleBookChange}
-    disabled={isLoading}
-  />
-
-  <p class="family">
-    <label for="family-name">姓氏 </label>
-    <input
-      type="text"
-      name="family-name"
-      bind:value={familyName}
-      placeholder="输入姓氏"
-    />
-  </p>
-
-  <button
-    class="btn-go"
-    onclick={handleGenerate}
-    disabled={isLoading || poems.length === 0}>起名</button
-  >
-</div>
-
-<div class="result">
-  <div class="result-container">
-    {#each generatedNames as name, i (i)}
-      <NameCard {familyName} generatedName={name} />
-    {/each}
+  <!-- Results grid -->
+  <div aria-live="polite">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      {#each generatedNames as name, i (i)}
+        <NameCard {familyName} generatedName={name} index={i} />
+      {/each}
+    </div>
   </div>
 </div>
 
 <LoadingOverlay visible={isLoading} />
 
-<style>
-  .input-container {
-    padding: 1rem;
-  }
-
-  .title {
-    margin: 0;
-  }
-
-  .title small {
-    font-size: 0.6em;
-    font-weight: normal;
-  }
-
-  .family label {
-    font-size: 2rem;
-  }
-
-  .family input {
-    font-size: 1rem;
-    padding: 0.3rem 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 2px;
-  }
-
-  .btn-go {
-    width: 100%;
-    line-height: 3;
-    background-color: #c73a1e;
-    color: #fff;
-    border-radius: 2px;
-    padding: 0.2rem 1.1rem;
-    border: none;
-    text-align: center;
-    margin: 0.2rem auto;
-    outline: none;
-    cursor: pointer;
-    font-size: 1rem;
-  }
-
-  .btn-go:hover {
-    background-color: #d94f3a;
-  }
-
-  .btn-go:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .result {
-    position: relative;
-  }
-
-  .result-container {
-    list-style-type: none;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  a {
-    color: #c73a1e;
-  }
-</style>
+<!-- Footer -->
+<footer class="text-center mt-16 pb-8">
+  <p class="text-xs text-stone-400">Designed by Will</p>
+</footer>

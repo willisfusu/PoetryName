@@ -26,6 +26,7 @@ There is no automated test suite. Validate changes by running `npm run build` an
 **Root component**: `src/App.svelte` — wrapper layout (60% width desktop, 80% mobile, max-width 800px), renders `NameGenerator`.
 
 **Components** (`src/lib/components/`):
+
 - `NameGenerator.svelte` — main component with Svelte 5 runes state (`$state`, `$derived`). Manages book selection, family name input, name generation, and loading state. Integrates all other components.
 - `BookSelector.svelte` — radio group for selecting poetry collections. Custom animated radio button styling replicating the original design.
 - `NameCard.svelte` — displays a generated name with highlighted source sentence and metadata (book, title, dynasty, author).
@@ -33,12 +34,14 @@ There is no automated test suite. Validate changes by running `npm run build` an
 - `ui/` — shadcn-svelte components (button, card, input, radio-group).
 
 **Name generation**: `src/lib/namer.ts` — pure functions ported from the original `Namer` class:
+
 - `loadBook(book)` — fetches poetry JSON from `/json/{book}.json` via native `fetch()`
 - `genName(poems)` — picks a random passage, splits into sentences, strips punctuation and inauspicious characters (`cleanBadChar`), extracts two random characters via `getTwoChar()`, returns name + source metadata
 - `genNames(poems, count)` — generates multiple names (default: 6), filters nulls
 - Characters are kept in original poem order (first index ≤ second index)
 
 **Utilities**:
+
 - `src/lib/rand.ts` — `choose<T>(arr)` and `between(min, max)` typed helpers
 - `src/lib/config.ts` — constants: `DEBUG_MODE`, `DEFAULT_BOOK` (`'shijing'`), `DEFAULT_FAMILY_NAME` (`'李'`), `NAME_AMOUNT` (`6`), `BOOKS` array, `BAD_CHARS` string
 - `src/lib/types.ts` — TypeScript interfaces: `PoemEntry`, `BookConfig`, `GeneratedName`
@@ -71,3 +74,12 @@ There is no automated test suite. Validate changes by running `npm run build` an
 - shadcn-svelte 1.1.1, bits-ui 2.15.5, lucide-svelte 0.563.0
 - oxlint, prettier + prettier-plugin-svelte, svelte-check
 - Static JSON files served from `public/json/` (no database)
+
+## Active Technologies
+
+- TypeScript 5.9, Svelte 5.43 + Svelte 5, Tailwind CSS v4.1, shadcn-svelte 1.1.1, bits-ui 2.15.5, lucide-svelte 0.563.0 (002-ui-redesign)
+- N/A (static JSON, no changes) (002-ui-redesign)
+
+## Recent Changes
+
+- 002-ui-redesign: Added TypeScript 5.9, Svelte 5.43 + Svelte 5, Tailwind CSS v4.1, shadcn-svelte 1.1.1, bits-ui 2.15.5, lucide-svelte 0.563.0

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fade } from "svelte/transition";
   import { LoaderCircle } from "lucide-svelte";
 
   interface Props {
@@ -9,11 +10,12 @@
 </script>
 
 {#if visible}
-  <div class="absolute z-100 left-0 top-0 min-h-screen w-full bg-black/5">
-    <LoaderCircle
-      size={100}
-      class="animate-spin block mx-auto mt-[40vh]"
-      color="#f8f8f4"
-    />
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm"
+    role="status"
+    aria-live="polite"
+    transition:fade={{ duration: 200 }}
+  >
+    <LoaderCircle size={80} class="animate-spin text-accent" />
   </div>
 {/if}
