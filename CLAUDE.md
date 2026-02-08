@@ -77,6 +77,9 @@ There is no automated test suite. Validate changes by running `npm run build` an
 
 ## Active Technologies
 
+- TypeScript 5.9, Svelte 5.43 + Svelte 5, Tailwind CSS v4.1, bits-ui 2.15.5, lucide-svelte 0.563.0, shadcn-svelte 1.1.1 (003-ai-name-eval)
+- Browser localStorage (API key only) (003-ai-name-eval)
+
 - TypeScript 5.9, Svelte 5.43 + Svelte 5, Tailwind CSS v4.1, shadcn-svelte 1.1.1, bits-ui 2.15.5, lucide-svelte 0.563.0 (002-ui-redesign)
 - N/A (static JSON, no changes) (002-ui-redesign)
 

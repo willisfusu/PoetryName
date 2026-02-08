@@ -20,3 +20,19 @@ export interface GeneratedName {
   book: string;
   dynasty: string;
 }
+
+export interface NameEvaluation {
+  score: number;
+  explanation: string;
+  phonetic: number;
+  meaning: number;
+  aesthetics: number;
+  compatibility: number;
+}
+
+export interface EvaluatedName {
+  generated: GeneratedName;
+  evaluation: NameEvaluation | null;
+}
+
+export type EvaluationState = "idle" | "evaluating" | "completed" | "failed";
