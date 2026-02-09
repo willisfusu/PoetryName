@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
+  import { flip } from "svelte/animate";
+  import { quintOut } from "svelte/easing";
   import type {
     PoemEntry,
     GeneratedName,
@@ -36,6 +38,8 @@
   let toastMessage = $state("");
   let toastVisible = $state(false);
   let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+  let isEntrance = $state(true);
+  let reducedMotion = $state(false);
 
   let topPickIndices = $derived.by(() => {
     if (evaluationState !== "completed" || evaluations.length === 0)
@@ -54,6 +58,8 @@
     return new Set(scored.slice(0, 2).map((s) => s.index));
   });
 
+  let flipDuration = $derived(reducedMotion ? 0 : 500);
+
   function showToast(message: string) {
     toastMessage = message;
     toastVisible = true;
@@ -64,6 +70,10 @@
   }
 
   onMount(async () => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    reducedMotion = mq.matches;
+    mq.addEventListener('change', (e) => { reducedMotion = e.matches; });
+
     poems = await loadBook(DEFAULT_BOOK);
     isLoading = false;
   });
@@ -86,6 +96,7 @@
     // Reset evaluation state
     evaluationState = "idle";
     evaluations = [];
+    isEntrance = true;
 
     // Generate names (existing logic)
     generatedNames = genNames(poems, NAME_AMOUNT);
@@ -109,6 +120,7 @@
           eval: results[i] ?? null,
         }));
         pairs.sort((a, b) => (b.eval?.score ?? 0) - (a.eval?.score ?? 0));
+        isEntrance = false;
         generatedNames = pairs.map((p) => p.name);
         evaluations = pairs.map((p) => p.eval);
         evaluationState = "completed";
@@ -188,15 +200,18 @@
   <!-- Results grid -->
   <div aria-live="polite">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-      {#each generatedNames as name, i (i)}
-        <NameCard
-          {familyName}
-          generatedName={name}
-          index={i}
-          evaluation={evaluations[i] ?? null}
-          {evaluationState}
-          isTopPick={topPickIndices.has(i)}
-        />
+      {#each generatedNames as name, i (name.name + name.sentence)}
+        <div animate:flip={{ duration: flipDuration, easing: quintOut }}>
+          <NameCard
+            {familyName}
+            generatedName={name}
+            index={i}
+            evaluation={evaluations[i] ?? null}
+            {evaluationState}
+            isTopPick={topPickIndices.has(i)}
+            {isEntrance}
+          />
+        </div>
       {/each}
     </div>
     {#if toastVisible}

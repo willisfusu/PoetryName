@@ -14,6 +14,7 @@
     evaluation?: NameEvaluation | null;
     evaluationState?: EvaluationState;
     isTopPick?: boolean;
+    isEntrance?: boolean;
   }
 
   let {
@@ -23,6 +24,7 @@
     evaluation = null,
     evaluationState = "idle",
     isTopPick = false,
+    isEntrance = true,
   }: Props = $props();
 
   function getScoreColor(score: number): string {
@@ -53,7 +55,7 @@
   class="border-card-border shadow-sm hover:shadow-md hover:border-accent/30 transition-all duration-200 overflow-hidden relative {isTopPick
     ? 'border-accent shadow-[0_0_12px_rgba(184,134,11,0.15)]'
     : ''}"
-  style="animation: fadeSlideUp 0.3s ease-out {index * 50}ms both"
+  style={isEntrance ? `animation: fadeSlideUp 0.3s ease-out ${index * 50}ms both` : ''}
 >
   {#if isTopPick}
     <span
