@@ -12,3 +12,5 @@ Thumbs.db
 .claude
 .specify
 specs
+.codexbuild/
+coverage/

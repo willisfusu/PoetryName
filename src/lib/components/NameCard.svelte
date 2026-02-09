@@ -1,37 +1,25 @@
 <script lang="ts">
-  import type {
-    GeneratedName,
-    NameEvaluation,
-    EvaluationState,
-  } from "$lib/types";
+  import type { NameCandidate } from "$lib/types";
   import { Card, CardContent, CardFooter } from "$lib/components/ui/card";
-  import EvalLoadingIndicator from "./EvalLoadingIndicator.svelte";
+  import { Button } from "$lib/components/ui/button";
 
   interface Props {
     familyName: string;
-    generatedName: GeneratedName;
+    candidate: NameCandidate;
     index?: number;
-    evaluation?: NameEvaluation | null;
-    evaluationState?: EvaluationState;
-    isTopPick?: boolean;
+    isSelected?: boolean;
     isEntrance?: boolean;
+    onselect?: (candidate: NameCandidate) => void;
   }
 
   let {
     familyName,
-    generatedName,
+    candidate,
     index = 0,
-    evaluation = null,
-    evaluationState = "idle",
-    isTopPick = false,
+    isSelected = false,
     isEntrance = true,
+    onselect = () => {},
   }: Props = $props();
-
-  function getScoreColor(score: number): string {
-    if (score >= 8) return "bg-accent text-white";
-    if (score >= 5) return "bg-stone-200 text-stone-700";
-    return "bg-stone-100 text-stone-500";
-  }
 
   function highlightChars(sentence: string, name: string): string {
     const chars = name.split("");
@@ -47,72 +35,55 @@
   }
 
   let highlightedSentence = $derived(
-    highlightChars(generatedName.sentence, generatedName.name),
+    highlightChars(candidate.excerpt, candidate.name),
   );
+
+  function handleSelect() {
+    onselect(candidate);
+  }
 </script>
 
 <Card
-  class="border-card-border shadow-sm hover:shadow-md hover:border-accent/30 transition-all duration-200 overflow-hidden relative {isTopPick
+  class="border-card-border shadow-sm hover:shadow-md hover:border-accent/30 transition-all duration-200 overflow-hidden relative {isSelected
     ? 'border-accent shadow-[0_0_12px_rgba(184,134,11,0.15)]'
     : ''}"
   style={isEntrance ? `animation: fadeSlideUp 0.3s ease-out ${index * 50}ms both` : ''}
 >
-  {#if isTopPick}
+  {#if isSelected}
     <span
       class="absolute top-3 right-3 bg-accent text-white text-xs font-medium px-2 py-0.5 rounded-full z-10"
-      >推荐</span
+      >已选择</span
     >
   {/if}
-  <CardContent class="pt-6">
+
+  <CardContent class="pt-6 space-y-4">
     <h3
-      class="font-serif text-5xl font-semibold text-stone-900 text-center mb-4"
+      class="font-serif text-5xl font-semibold text-stone-900 text-center"
     >
-      {familyName}{generatedName.name}
+      {familyName}{candidate.name}
     </h3>
     <p class="text-base text-stone-700 leading-relaxed text-center">
       「{@html highlightedSentence}」
     </p>
+    <div class="candidate-reason rounded-lg bg-stone-50 border border-stone-100 px-3 py-2">
+      <p class="candidate-reason-label text-xs text-stone-400 mb-1">命名理由</p>
+      <p class="candidate-reason-text text-sm text-stone-600 leading-relaxed">{candidate.reason}</p>
+    </div>
   </CardContent>
-  <CardFooter class="text-sm text-text-muted flex justify-between">
-    <span>{generatedName.book} · {generatedName.title}</span>
-    <span>[{generatedName.dynasty}] {generatedName.author || "佚名"}</span>
+
+  <CardFooter class="text-sm text-text-muted flex justify-between items-center gap-3">
+    <span>
+      {candidate.sourceReference?.book || "诗文"}
+      {#if candidate.sourceReference?.title}
+        · {candidate.sourceReference.title}
+      {/if}
+    </span>
+    <Button
+      class="bg-accent text-text-on-accent hover:bg-accent-hover cursor-pointer"
+      size="sm"
+      onclick={handleSelect}
+    >
+      {isSelected ? "已选中" : "选择此名"}
+    </Button>
   </CardFooter>
-  {#if evaluationState === "evaluating"}
-    <div class="px-6 pb-5">
-      <EvalLoadingIndicator />
-    </div>
-  {:else if evaluation}
-    <div class="px-6 pb-5 pt-1 border-t border-stone-100 mt-1 space-y-3">
-      <div class="flex items-start gap-3">
-        <div
-          class="flex-shrink-0 w-12 h-12 rounded-full {getScoreColor(
-            evaluation.score,
-          )} flex items-center justify-center font-serif text-2xl font-semibold"
-        >
-          {evaluation.score}
-        </div>
-        <p class="text-sm text-stone-600 leading-relaxed flex-1">
-          {evaluation.explanation}
-        </p>
-      </div>
-      <div class="flex flex-wrap gap-1.5">
-        <span
-          class="text-xs px-2 py-0.5 rounded-full bg-stone-100 text-stone-500"
-          >音韵 {evaluation.phonetic}</span
-        >
-        <span
-          class="text-xs px-2 py-0.5 rounded-full bg-stone-100 text-stone-500"
-          >寓意 {evaluation.meaning}</span
-        >
-        <span
-          class="text-xs px-2 py-0.5 rounded-full bg-stone-100 text-stone-500"
-          >字形 {evaluation.aesthetics}</span
-        >
-        <span
-          class="text-xs px-2 py-0.5 rounded-full bg-stone-100 text-stone-500"
-          >搭配 {evaluation.compatibility}</span
-        >
-      </div>
-    </div>
-  {/if}
 </Card>

@@ -40,3 +40,10 @@
 
 - All corpus JSON files are client-shipped; never store secrets or private data in `src/scripts/json/`.
 - Keep third-party dependency updates intentional and review `package-lock.json` diffs carefully.
+
+## Active Technologies
+- TypeScript 5.9, Svelte 5.43 + Svelte 5, Vite 7, existing AI proxy integration, Tailwind CSS 4, bits-ui 2 (001-generate-poetry-names)
+- In-memory generation state; browser localStorage for API key persistence (001-generate-poetry-names)
+
+## Recent Changes
+- 001-generate-poetry-names: Added TypeScript 5.9, Svelte 5.43 + Svelte 5, Vite 7, existing AI proxy integration, Tailwind CSS 4, bits-ui 2

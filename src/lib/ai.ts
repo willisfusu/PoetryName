@@ -1,136 +1,292 @@
-import type { GeneratedName, NameEvaluation } from "./types";
-import { AI_PROXY_URL, AI_MODEL, AI_MAX_TOKENS } from "./config";
+import type {
+  GenerationRequest,
+  GenerationResult,
+  GeneratedName,
+  NameCandidate,
+  PoetrySource,
+  ProviderConfig,
+} from "./types";
+import {
+  AI_MAX_TOKENS,
+  ANTHROPIC_API_PATH,
+  OPENAI_API_PATH,
+  NAME_GENERATION_MAX,
+  NAME_GENERATION_MIN,
+} from "./config";
+import { getProviderConfig } from "./ai-config";
 
-export interface EvaluateNamesParams {
-  familyName: string;
-  names: GeneratedName[];
-  apiKey: string;
+interface AIMessageContent {
+  text?: string;
+}
+
+interface AIResponse {
+  content?: AIMessageContent[];
+}
+
+interface OpenAIResponse {
+  choices?: { message?: { content?: string } }[];
+}
+
+interface GenerateNamesParams {
+  poetrySource: PoetrySource;
+  requestedCount: number;
+  excludedNames?: string[];
   signal?: AbortSignal;
 }
 
-export function buildPrompt(
-  familyName: string,
-  names: GeneratedName[],
+interface ParsedNameCandidate {
+  name?: unknown;
+  excerpt?: unknown;
+  reason?: unknown;
+  sourceReference?: {
+    book?: unknown;
+    title?: unknown;
+    author?: unknown;
+    dynasty?: unknown;
+  };
+}
+
+function createId(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function clampRequestedCount(requestedCount: number): number {
+  return Math.max(
+    NAME_GENERATION_MIN,
+    Math.min(NAME_GENERATION_MAX, Math.round(requestedCount)),
+  );
+}
+
+function extractJsonArray(responseText: string): ParsedNameCandidate[] | null {
+  let jsonStr = responseText.trim();
+  const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    jsonStr = codeBlockMatch[1].trim();
+  }
+
+  const parsed = JSON.parse(jsonStr) as unknown;
+  if (!Array.isArray(parsed)) {
+    return null;
+  }
+  return parsed as ParsedNameCandidate[];
+}
+
+function mapCandidate(item: ParsedNameCandidate): NameCandidate | null {
+  const name = typeof item.name === "string" ? item.name.trim() : "";
+  const excerpt = typeof item.excerpt === "string" ? item.excerpt.trim() : "";
+  const reason = typeof item.reason === "string" ? item.reason.trim() : "";
+
+  if (!name || !excerpt || !reason) {
+    return null;
+  }
+
+  return {
+    candidateId: createId("cand"),
+    name,
+    excerpt,
+    reason,
+    sourceReference: {
+      book:
+        typeof item.sourceReference?.book === "string"
+          ? item.sourceReference.book
+          : undefined,
+      title:
+        typeof item.sourceReference?.title === "string"
+          ? item.sourceReference.title
+          : undefined,
+      author:
+        typeof item.sourceReference?.author === "string"
+          ? item.sourceReference.author
+          : undefined,
+      dynasty:
+        typeof item.sourceReference?.dynasty === "string"
+          ? item.sourceReference.dynasty
+          : undefined,
+    },
+    isValid: true,
+  };
+}
+
+export function buildGenerationPrompt(
+  poetrySource: PoetrySource,
+  requestedCount: number,
+  excludedNames: string[] = [],
 ): string {
-  const nameList = names
-    .map(
-      (n, i) =>
-        `${i + 1}. ${n.name} — 出自「${n.sentence}」（${n.book}·${n.title}，${n.dynasty} ${n.author || "佚名"}）`,
-    )
-    .join("\n");
+  const excludedLine =
+    excludedNames.length > 0
+      ? `\n请尽量避免重复以下名字：${excludedNames.join("、")}`
+      : "";
 
-  return `你是一位精通中国古典文学和姓名学的专家。请评估以下从古诗文中提取的名字。
+  return `你是一位精通中国古典文学与姓名美学的专家。请基于下面提供的诗文内容，生成 ${requestedCount} 个中文名字候选。
 
-姓氏：${familyName || "（未指定）"}
+来源类型：${poetrySource.sourceType}
+来源书目：${poetrySource.book || "未指定"}
+诗文内容：
+${poetrySource.poetryText}
+${excludedLine}
 
-请对以下每个名字进行评分（1-10分），并给出简短的中文评语。
-评分维度：音韵和谐、文化寓意、字形美感、姓名搭配。
+要求：
+1. 每个候选名字应简洁、适合起名。
+2. 每个候选都必须提供对应诗句摘录（excerpt）。
+3. 每个候选都必须提供简要理由（reason），说明名字与诗文关系。
+4. 候选之间尽量避免重复。
 
-名字列表：
-${nameList}
-
-请严格按以下JSON格式返回结果，不要包含其他内容：
+请严格返回 JSON 数组，不要输出任何额外文本，格式如下：
 [
   {
-    "name": "名字",
-    "score": 8,
-    "phonetic": 8,
-    "meaning": 9,
-    "aesthetics": 7,
-    "compatibility": 8,
-    "explanation": "简短评语（2-3句话）"
+    "name": "清和",
+    "excerpt": "诗句摘录",
+    "reason": "简要解释",
+    "sourceReference": {
+      "book": "诗经",
+      "title": "关雎",
+      "author": "佚名",
+      "dynasty": "先秦"
+    }
   }
 ]`;
 }
 
-function clampScore(value: unknown): number {
-  const num = typeof value === "number" ? value : Number(value);
-  if (isNaN(num)) return 5;
-  return Math.max(1, Math.min(10, Math.round(num)));
-}
-
-export function parseEvaluationResponse(
-  responseText: string,
-): NameEvaluation[] | null {
+export function parseGenerationResponse(responseText: string): NameCandidate[] | null {
   try {
-    // Try to extract JSON from the response (handle markdown code blocks)
-    let jsonStr = responseText.trim();
-    const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (codeBlockMatch) {
-      jsonStr = codeBlockMatch[1].trim();
+    const parsed = extractJsonArray(responseText);
+    if (!parsed) {
+      return null;
     }
 
-    const parsed = JSON.parse(jsonStr);
-    if (!Array.isArray(parsed)) return null;
-
-    return parsed.map((item: Record<string, unknown>) => ({
-      score: clampScore(item.score),
-      phonetic: clampScore(item.phonetic),
-      meaning: clampScore(item.meaning),
-      aesthetics: clampScore(item.aesthetics),
-      compatibility: clampScore(item.compatibility),
-      explanation: typeof item.explanation === "string" ? item.explanation : "",
-    }));
+    return parsed
+      .map(mapCandidate)
+      .filter((candidate): candidate is NameCandidate => candidate !== null);
   } catch {
     return null;
   }
 }
 
-export async function evaluateNames(
-  params: EvaluateNamesParams,
-): Promise<(NameEvaluation | null)[]> {
-  const { familyName, names, apiKey, signal } = params;
-  const prompt = buildPrompt(familyName, names);
+function buildAnthropicHeaders(config: ProviderConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-API-Key": config.apiKey,
+  };
+  if (config.providerType === "anthropic") {
+    headers["anthropic-version"] = "2023-06-01";
+  }
+  return headers;
+}
 
-  const response = await fetch(AI_PROXY_URL, {
+function buildOpenAIHeaders(config: ProviderConfig): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${config.apiKey}`,
+  };
+}
+
+function parseAnthropicResponse(data: unknown): string {
+  const resp = data as AIResponse;
+  const text = resp?.content?.[0]?.text;
+  if (typeof text !== "string") {
+    throw new Error("Failed to parse AI generation response");
+  }
+  return text;
+}
+
+function parseOpenAIResponse(data: unknown): string {
+  const resp = data as OpenAIResponse;
+  const text = resp?.choices?.[0]?.message?.content;
+  if (typeof text !== "string") {
+    throw new Error("Failed to parse AI generation response");
+  }
+  return text;
+}
+
+async function requestAIContent(
+  prompt: string,
+  config: ProviderConfig,
+  signal?: AbortSignal,
+): Promise<string> {
+  const isOpenAI = config.requestFormat === "openai";
+
+  const headers = isOpenAI
+    ? buildOpenAIHeaders(config)
+    : buildAnthropicHeaders(config);
+
+  const body = JSON.stringify({
+    model: config.model,
+    max_tokens: AI_MAX_TOKENS,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const base = config.baseUrl.replace(/\/+$/, "");
+  const path = isOpenAI ? OPENAI_API_PATH : ANTHROPIC_API_PATH;
+  const url = `${base}${path}`;
+
+  const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": apiKey,
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      max_tokens: AI_MAX_TOKENS,
-      messages: [{ role: "user", content: prompt }],
-    }),
+    headers,
+    body,
     signal,
   });
 
   if (!response.ok) {
-    throw new Error(`AI evaluation failed with status ${response.status}`);
+    throw new Error(`AI generation failed with status ${response.status}`);
   }
 
   const data = await response.json();
-  const text = data?.content?.[0]?.text;
-  if (typeof text !== "string") {
-    throw new Error("Failed to parse AI evaluation response");
+
+  return isOpenAI ? parseOpenAIResponse(data) : parseAnthropicResponse(data);
+}
+
+export async function generateNameCandidates(
+  params: GenerateNamesParams,
+): Promise<GenerationResult> {
+  const {
+    poetrySource,
+    requestedCount,
+    excludedNames = [],
+    signal,
+  } = params;
+
+  const config = getProviderConfig();
+  const clampedCount = clampRequestedCount(requestedCount);
+  const requestId = createId("req");
+
+  const requestPayload: GenerationRequest = {
+    requestId,
+    poetrySource,
+    requestedCount: clampedCount,
+    excludedNames,
+    createdAt: new Date().toISOString(),
+  };
+
+  const prompt = buildGenerationPrompt(
+    requestPayload.poetrySource,
+    requestPayload.requestedCount,
+    requestPayload.excludedNames,
+  );
+
+  const text = await requestAIContent(prompt, config, signal);
+  const candidates = parseGenerationResponse(text);
+
+  if (!candidates || candidates.length === 0) {
+    throw new Error("Failed to parse AI generation response");
   }
 
-  const evaluations = parseEvaluationResponse(text);
-  if (!evaluations) {
-    throw new Error("Failed to parse AI evaluation response");
-  }
+  return {
+    generationId: createId("gen"),
+    requestId,
+    candidates,
+    status: "completed",
+    generatedAt: new Date().toISOString(),
+  };
+}
 
-  // Match evaluations to input names by the "name" field from the parsed response
-  // If we can match by name, do so; otherwise fall back to index alignment
-  const parsedRaw = (() => {
-    try {
-      let jsonStr = text.trim();
-      const m = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (m) jsonStr = m[1].trim();
-      return JSON.parse(jsonStr) as { name?: string }[];
-    } catch {
-      return [];
-    }
-  })();
-
-  return names.map((genName, i) => {
-    // Try to find by name match first
-    const matchIdx = parsedRaw.findIndex((item) => item.name === genName.name);
-    if (matchIdx >= 0 && evaluations[matchIdx]) {
-      return evaluations[matchIdx];
-    }
-    // Fall back to index alignment
-    return evaluations[i] ?? null;
-  });
+export function toPoetrySourceFromGeneratedName(name: GeneratedName): PoetrySource {
+  return {
+    sourceType: "builtin",
+    sourceId: `${name.book}-${name.title}`,
+    book: name.book,
+    poetryText: name.content,
+    title: name.title,
+    author: name.author,
+    dynasty: name.dynasty,
+  };
 }

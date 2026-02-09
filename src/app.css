@@ -63,20 +63,21 @@ body {
   }
 }
 
-/* Card washing animation enhancement for rerank */
-@keyframes cardWash {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  40% {
-    transform: scale(0.97);
-    opacity: 0.85;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+textarea:focus {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.candidate-reason {
+  background: linear-gradient(180deg, #fafafa 0%, #f7f4ef 100%);
+}
+
+.candidate-reason-label {
+  letter-spacing: 0.02em;
+}
+
+.candidate-reason-text {
+  line-height: 1.65;
 }
 
 @media (prefers-reduced-motion: reduce) {

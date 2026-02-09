@@ -78,6 +78,7 @@ There is no automated test suite. Validate changes by running `npm run build` an
 ## Active Technologies
 - TypeScript 5.9, Svelte 5.43 + Svelte 5 built-in `animate:flip` (from `svelte/animate`) — no new dependencies (004-card-rerank-animation)
 - N/A (client-side animation only) (004-card-rerank-animation)
+- Browser localStorage (API key, provider config) (005-api-provider-config)
 
 - TypeScript 5.9, Svelte 5.43 + Svelte 5, Tailwind CSS v4.1, bits-ui 2.15.5, lucide-svelte 0.563.0, shadcn-svelte 1.1.1 (003-ai-name-eval)
 - Browser localStorage (API key only) (003-ai-name-eval)
