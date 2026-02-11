@@ -1,5 +1,11 @@
 node_modules/
 dist/
+.claude
+.specify
+.codexbuild/
+coverage/
+.codex/
+specs
 .DS_Store
 Thumbs.db
 *.log
@@ -8,10 +14,3 @@ Thumbs.db
 .env*
 .vscode/
 .idea/
-./dist
-.claude
-.specify
-.codexbuild/
-coverage/
-.codex/
-specs
