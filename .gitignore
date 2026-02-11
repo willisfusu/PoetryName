@@ -11,7 +11,7 @@ Thumbs.db
 ./dist
 .claude
 .specify
-specs
 .codexbuild/
 coverage/
-build/
+.codex/
+specs
