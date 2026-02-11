@@ -7,6 +7,7 @@ import type {
   ProviderConfig,
 } from "./types";
 import {
+  AI_REQUEST_TIMEOUT_MS,
   AI_MAX_TOKENS,
   ANTHROPIC_API_PATH,
   OPENAI_API_PATH,
@@ -57,6 +58,101 @@ function clampRequestedCount(requestedCount: number): number {
   );
 }
 
+function isolateJsonArray(input: string): string {
+  const start = input.indexOf("[");
+  const end = input.lastIndexOf("]");
+
+  if (start !== -1 && end !== -1 && end > start) {
+    return input.slice(start, end + 1);
+  }
+
+  return input;
+}
+
+function tryParseJsonArray(jsonStr: string): ParsedNameCandidate[] | null {
+  const parsed = JSON.parse(jsonStr) as unknown;
+  if (!Array.isArray(parsed)) {
+    return null;
+  }
+  return parsed as ParsedNameCandidate[];
+}
+
+function escapeInnerQuotesForFieldValue(input: string, field: string): string {
+  let result = input;
+  let searchIndex = 0;
+  const marker = `"${field}"`;
+
+  while (searchIndex < result.length) {
+    const fieldIndex = result.indexOf(marker, searchIndex);
+    if (fieldIndex === -1) {
+      break;
+    }
+
+    const colonIndex = result.indexOf(":", fieldIndex + marker.length);
+    if (colonIndex === -1) {
+      break;
+    }
+
+    let valueStart = colonIndex + 1;
+    while (valueStart < result.length && /\s/.test(result[valueStart])) {
+      valueStart += 1;
+    }
+
+    if (result[valueStart] !== '"') {
+      searchIndex = valueStart + 1;
+      continue;
+    }
+
+    let cursor = valueStart + 1;
+    while (cursor < result.length) {
+      const char = result[cursor];
+
+      if (char === "\\") {
+        cursor += 2;
+        continue;
+      }
+
+      if (char === '"') {
+        let lookahead = cursor + 1;
+        while (lookahead < result.length && /\s/.test(result[lookahead])) {
+          lookahead += 1;
+        }
+
+        const next = result[lookahead];
+        const isTerminator = next === "," || next === "}" || next === "]";
+        if (isTerminator) {
+          cursor += 1;
+          break;
+        }
+
+        result = `${result.slice(0, cursor)}\\${result.slice(cursor)}`;
+        cursor += 2;
+        continue;
+      }
+
+      cursor += 1;
+    }
+
+    searchIndex = cursor;
+  }
+
+  return result;
+}
+
+function repairLooseJsonArray(jsonStr: string): string {
+  let repaired = jsonStr;
+
+  repaired = repaired.replace(/,\s*([}\]])/g, "$1");
+
+  ["name", "excerpt", "reason", "book", "title", "author", "dynasty"].forEach(
+    (field) => {
+      repaired = escapeInnerQuotesForFieldValue(repaired, field);
+    },
+  );
+
+  return repaired;
+}
+
 function extractJsonArray(responseText: string): ParsedNameCandidate[] | null {
   let jsonStr = responseText.trim();
   const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -64,11 +160,19 @@ function extractJsonArray(responseText: string): ParsedNameCandidate[] | null {
     jsonStr = codeBlockMatch[1].trim();
   }
 
-  const parsed = JSON.parse(jsonStr) as unknown;
-  if (!Array.isArray(parsed)) {
-    return null;
+  jsonStr = isolateJsonArray(jsonStr);
+
+  try {
+    return tryParseJsonArray(jsonStr);
+  } catch {
+    const repaired = repairLooseJsonArray(jsonStr);
+
+    try {
+      return tryParseJsonArray(repaired);
+    } catch {
+      return null;
+    }
   }
-  return parsed as ParsedNameCandidate[];
 }
 
 function mapCandidate(item: ParsedNameCandidate): NameCandidate | null {
@@ -130,6 +234,7 @@ ${excludedLine}
 2. 每个候选都必须提供对应诗句摘录（excerpt）。
 3. 每个候选都必须提供简要理由（reason），说明名字与诗文关系。
 4. 候选之间尽量避免重复。
+5. 返回内容必须是严格合法 JSON；reason/excerpt 中如需强调词语，请使用「」而不是英文双引号 ".
 
 请严格返回 JSON 数组，不要输出任何额外文本，格式如下：
 [
@@ -219,12 +324,36 @@ async function requestAIContent(
   const path = isOpenAI ? OPENAI_API_PATH : ANTHROPIC_API_PATH;
   const url = `${base}${path}`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers,
-    body,
-    signal,
-  });
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => {
+    timeoutController.abort("timeout");
+  }, AI_REQUEST_TIMEOUT_MS);
+
+  const finalSignal = signal
+    ? AbortSignal.any([signal, timeoutController.signal])
+    : timeoutController.signal;
+
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers,
+      body,
+      signal: finalSignal,
+    });
+  } catch (error) {
+    const isTimeoutAbort =
+      timeoutController.signal.aborted && !(signal && signal.aborted);
+
+    if (isTimeoutAbort) {
+      throw new Error("AI generation timed out after 120000ms");
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     throw new Error(`AI generation failed with status ${response.status}`);

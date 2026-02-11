@@ -1,14 +1,17 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import type {
     NameCandidate,
     PoemEntry,
     PoetrySource,
     SelectedName,
+    WaitingFeedbackMode,
+    WaitingMessageStage,
   } from "$lib/types";
   import {
     BAD_CHARS,
     BOOKS,
+    LONG_WAIT_THRESHOLD_MS,
     DEFAULT_BOOK,
     DEFAULT_FAMILY_NAME,
     NAME_GENERATION_AMOUNT,
@@ -21,11 +24,13 @@
     hasApiKey,
     setSelectedName,
   } from "$lib/ai-config";
-  import { sanitizeCandidates } from "$lib/utils";
+  import { prefersReducedMotion, sanitizeCandidates } from "$lib/utils";
   import NameCard from "./NameCard.svelte";
+  import CardWashLoading from "./CardWashLoading.svelte";
   import LoadingOverlay from "./LoadingOverlay.svelte";
   import BookSelector from "./BookSelector.svelte";
   import SettingsDialog from "./SettingsDialog.svelte";
+  import { getWaitingMessage } from "./loading-feedback";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Settings } from "lucide-svelte";
@@ -46,7 +51,39 @@
   let toastMessage = $state("");
   let toastVisible = $state(false);
   let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+  let longWaitTimeout: ReturnType<typeof setTimeout> | null = null;
   let isEntrance = $state(true);
+  let waitingMode: WaitingFeedbackMode = $state("hidden");
+  let waitingMessageStage: WaitingMessageStage = $state("initial");
+  let generationErrorMessage = $state("");
+  let showRetryAfterFailure = $state(false);
+
+  let waitingMessage = $derived(getWaitingMessage(waitingMessageStage));
+
+  function clearLongWaitTimeout() {
+    if (longWaitTimeout) {
+      clearTimeout(longWaitTimeout);
+      longWaitTimeout = null;
+    }
+  }
+
+  function startWaitingFeedback() {
+    waitingMode = prefersReducedMotion()
+      ? "reduced_motion_fallback"
+      : "card_wash";
+    waitingMessageStage = "initial";
+    clearLongWaitTimeout();
+    longWaitTimeout = setTimeout(() => {
+      if (isGenerating) {
+        waitingMessageStage = "long_wait";
+      }
+    }, LONG_WAIT_THRESHOLD_MS);
+  }
+
+  function stopWaitingFeedback() {
+    waitingMode = "hidden";
+    clearLongWaitTimeout();
+  }
 
   function showToast(message: string) {
     toastMessage = message;
@@ -95,26 +132,32 @@
 
   function mapErrorMessage(error: unknown): string {
     if (!(error instanceof Error)) {
-      return "AI 起名失败，请稍后再试";
+      return "AI 起名失败，请点击重试";
     }
 
     if (error.message.includes("401")) {
-      return "API Key 无效，请在设置中重新配置";
+      return "API Key 无效，请在设置中重新配置后重试";
     }
     if (error.message.includes("429")) {
-      return "请求过于频繁，请稍后再试";
+      return "请求过于频繁，请稍后重试";
+    }
+    if (error.message.includes("timed out")) {
+      return "请求超时（2 分钟），请检查网络后重试";
     }
     if (error.message.includes("parse")) {
-      return "AI 返回格式异常，请重新生成";
+      return "AI 返回格式异常，请点击重试";
     }
 
-    return "AI 起名暂不可用";
+    return "AI 起名暂不可用，请点击重试";
   }
 
   async function generate(excludedNames: string[] = []) {
-    if (abortController) {
-      abortController.abort();
-      abortController = null;
+    showRetryAfterFailure = false;
+    generationErrorMessage = "";
+
+    if (isGenerating) {
+      showToast("AI 正在起名，请稍候");
+      return;
     }
 
     if (!hasApiKey()) {
@@ -130,6 +173,7 @@
     const controller = new AbortController();
     abortController = controller;
     isGenerating = true;
+    startWaitingFeedback();
 
     try {
       const result = await generateNameCandidates({
@@ -157,20 +201,27 @@
       selectedCandidateId = "";
       clearSelectedName();
       selectedNameInfo = null;
+      waitingMessageStage = "initial";
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
-      showToast(mapErrorMessage(error));
+      generationErrorMessage = mapErrorMessage(error);
+      waitingMessageStage = "failure";
+      showRetryAfterFailure = true;
+      showToast(generationErrorMessage);
     } finally {
       isGenerating = false;
       abortController = null;
+      stopWaitingFeedback();
     }
   }
 
   async function handleBookChange(book: string) {
     selectedBook = book;
     isLoading = true;
+    showRetryAfterFailure = false;
+    generationErrorMessage = "";
     candidates = [];
     selectedCandidateId = "";
     clearSelectedName();
@@ -179,12 +230,25 @@
   }
 
   async function handleGenerate() {
+    if (isGenerating) {
+      return;
+    }
     await generate();
   }
 
   async function handleRegenerate() {
+    if (isGenerating) {
+      return;
+    }
     const excludedNames = candidates.map((candidate) => candidate.name);
     await generate(excludedNames);
+  }
+
+  async function handleRetry() {
+    if (isGenerating) {
+      return;
+    }
+    await generate();
   }
 
   function handleSelect(candidate: NameCandidate) {
@@ -210,6 +274,14 @@
     selectedNameInfo = getSelectedName();
     selectedCandidateId = selectedNameInfo?.candidateId ?? "";
     isLoading = false;
+  });
+
+  onDestroy(() => {
+    if (abortController) {
+      abortController.abort();
+      abortController = null;
+    }
+    clearLongWaitTimeout();
   });
 </script>
 
@@ -289,17 +361,39 @@
       <p class="text-xs text-stone-400">请求编号：{requestId}</p>
     {/if}
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-      {#each candidates as candidate, i (candidate.candidateId)}
-        <NameCard
-          {familyName}
-          {candidate}
-          index={i}
-          isSelected={selectedCandidateId === candidate.candidateId}
-          {isEntrance}
-          onselect={handleSelect}
+    <div class="result-grid-stable space-y-3">
+      {#if isGenerating}
+        <p class="generation-status" aria-live="polite">{waitingMessage}</p>
+        <CardWashLoading
+          visible={isGenerating}
+          mode={waitingMode}
+          message={waitingMessage}
         />
-      {/each}
+      {:else if showRetryAfterFailure}
+        <p class="generation-status generation-status--failure" aria-live="polite">
+          {generationErrorMessage || getWaitingMessage("failure")}
+        </p>
+        <Button
+          variant="outline"
+          class="cursor-pointer"
+          onclick={handleRetry}
+          disabled={isLoading || isGenerating}
+          >重试生成</Button
+        >
+      {/if}
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {#each candidates as candidate, i (candidate.candidateId)}
+          <NameCard
+            {familyName}
+            {candidate}
+            index={i}
+            isSelected={selectedCandidateId === candidate.candidateId}
+            {isEntrance}
+            onselect={handleSelect}
+          />
+        {/each}
+      </div>
     </div>
 
     {#if toastVisible}
@@ -314,7 +408,7 @@
   </div>
 </div>
 
-<LoadingOverlay visible={isLoading || isGenerating} />
+<LoadingOverlay visible={isLoading} />
 
 <footer class="text-center mt-16 pb-8">
   <p class="text-xs text-stone-400">Designed by Will</p>

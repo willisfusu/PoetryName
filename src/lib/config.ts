@@ -24,10 +24,15 @@ export const BAD_CHARS =
 export const AI_PROXY_URL = "https://onedayai.autocode.space";
 export const AI_MODEL = "claude-opus-4-5-20251101";
 export const AI_MAX_TOKENS = 2048;
+export const AI_REQUEST_TIMEOUT_MS = 120000;
 export const ANTHROPIC_API_PATH = "/v1/messages";
 export const OPENAI_API_PATH = "/v1/chat/completions";
 export const SELECTED_NAME_STORAGE_KEY = "poetryname_selected_name";
 export const PROVIDER_CONFIG_STORAGE_KEY = "poetryname_provider_config";
+export const LONG_WAIT_THRESHOLD_MS = 8000;
+export const CARD_WASH_ANIMATION_STAGGER = 0.12;
+export const CARD_WASH_ANIMATION_DURATION = 1.2;
+export const CARD_WASH_PLACEHOLDER_COUNT = 4;
 
 export const PROVIDER_PRESETS: ProviderPreset[] = [
   {

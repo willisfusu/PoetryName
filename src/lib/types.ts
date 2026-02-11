@@ -59,6 +59,13 @@ export interface NameCandidate {
 
 export type GenerationStatus = "idle" | "generating" | "completed" | "failed";
 
+export type WaitingFeedbackMode =
+  | "card_wash"
+  | "reduced_motion_fallback"
+  | "hidden";
+
+export type WaitingMessageStage = "initial" | "long_wait" | "failure";
+
 export interface GenerationResult {
   generationId: string;
   requestId: string;

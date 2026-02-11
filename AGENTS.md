@@ -44,6 +44,8 @@
 ## Active Technologies
 - TypeScript 5.9, Svelte 5.43 + Svelte 5, Vite 7, existing AI proxy integration, Tailwind CSS 4, bits-ui 2 (001-generate-poetry-names)
 - In-memory generation state; browser localStorage for API key persistence (001-generate-poetry-names)
+- TypeScript 5.9, Svelte 5.43 + Svelte 5, Vite 7, Tailwind CSS 4, bits-ui 2, lucide-svelte, GSAP 3.x (new) (001-card-wash-animation)
+- Browser `localStorage` (API key + selected name metadata), in-memory UI state for generation status (001-card-wash-animation)
 
 ## Recent Changes
 - 001-generate-poetry-names: Added TypeScript 5.9, Svelte 5.43 + Svelte 5, Vite 7, existing AI proxy integration, Tailwind CSS 4, bits-ui 2

@@ -80,6 +80,75 @@ textarea:focus {
   line-height: 1.65;
 }
 
+.card-wash-wrapper {
+  border: 1px solid var(--color-card-border);
+  border-radius: 0.9rem;
+  background: linear-gradient(180deg, #fffdf9 0%, #faf6ef 100%);
+  padding: 1rem;
+}
+
+.card-wash-message {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.card-wash-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+@media (min-width: 768px) {
+  .card-wash-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.card-wash-card {
+  border: 1px solid #ece2d5;
+  border-radius: 0.75rem;
+  background: #fff;
+  min-height: 112px;
+  padding: 0.8rem;
+  box-shadow: 0 1px 2px rgb(120 113 108 / 8%);
+}
+
+.card-wash-card--fallback {
+  animation: fadeSlideUp 0.6s ease-in-out infinite alternate;
+}
+
+.card-wash-line {
+  height: 0.6rem;
+  border-radius: 9999px;
+  margin-bottom: 0.6rem;
+  background: linear-gradient(90deg, #f4ecdf 0%, #f8f2e9 40%, #f4ecdf 100%);
+  background-size: 240% 100%;
+  background-position: 0% 50%;
+}
+
+.card-wash-line--title {
+  width: 35%;
+  height: 0.75rem;
+}
+
+.card-wash-line--short {
+  width: 70%;
+}
+
+.result-grid-stable {
+  min-height: 14rem;
+}
+
+.generation-status {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.generation-status--failure {
+  color: #9a3412;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

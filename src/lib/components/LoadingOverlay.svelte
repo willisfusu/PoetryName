@@ -11,7 +11,7 @@
 
 {#if visible}
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm"
+    class="fixed inset-0 z-40 flex items-center justify-center bg-bg/80 backdrop-blur-sm"
     role="status"
     aria-live="polite"
     transition:fade={{ duration: 200 }}
