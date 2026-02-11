@@ -1,11 +1,11 @@
 node_modules/
 dist/
-.claude
-.specify
+.claude/
+.specify/
 .codexbuild/
 coverage/
 .codex/
-specs
+specs/
 .DS_Store
 Thumbs.db
 *.log
